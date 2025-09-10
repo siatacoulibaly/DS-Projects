@@ -1,0 +1,732 @@
+{
+  "name": "My Trip Planer AI Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "b24b05a7-d802-4413-bfb1-23e1e76f6203",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        368,
+        32
+      ],
+      "webhookId": "a889d2ae-2159-402f-b326-5f61e90f602e"
+    },
+    {
+      "parameters": {
+        "content": "## Start by saying 'hi'\n![Button](https://i.imgur.com/PrIBJI6.png)",
+        "height": 149,
+        "width": 150
+      },
+      "id": "5592c045-6718-4c4e-9961-ce67a251b6df",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=I need a travel plan. The vacation is from a start date to an end date. Identify those dates from {{ $json.chatInput }}. The file containing the cities and activities is named in {{ $json.chatInput }}, identify it. In GetFilesList, provide the value of the parameter 'q' in the following format: \"name = 'filename'\". Then, get the fileid from the GetFilesList output, provide the URL of the GetFileContent in the following format: https://www.googleapis.com/drive/v3/files/fileid/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; download the file content, and use it to continue.\nThe activities can be grouped by city. Please provide the output in two sections: 1) A daily timetable in Markdown table format as indicated in the Output Parser tool, with columns for Day, Time, Activity, and Location. 2) A summary section with bullet points detailing the estimated total commute time, total estimated cost, and the average number of activities per day.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are a professional travel planner specializing in creating detailed itineraries. Your task is to analyze a file containing a list of cities and activities for a vacation. Your output must be a well-structured travel plan.\n\nYour workflow must follow these steps:\n\nExtract Information: Use the chat model to extract the filename, start date, and end date from the user's initial message.\n\nVerify Information: If any of these three pieces of information are missing, you must ask the user explicit and direct clarifying questions to get what you need. Do not proceed until you have all three.\n\nProcess Data: Once you have the necessary information and have accessed the file (via the GetListofFiles tool), use the list of cities and activities to create a daily timetable.\n\nThe day should start at 10 AM and end no later than 12 AM.\n\nMake reasonable assumptions for commute times, costs, and activity durations. Make sure the day is full of activities including break times for lunch and dinner. Plan everyday from start date to end date.\n\nCreate Outputs: Your final output must contain two distinct sections:\n\nTimetable: A daily timetable presented in a table format. Columns should be Date, Time, Activity, and Location. Format it as indicated in the output parser tool.\n\nSummary: A summary of logistics using bullet points. Include the estimated total commute time, total estimated cost, and the average number of activities per day.\n\nSeek Approval: After generating the timetable and summary, you must send this information to the user's Discord and email for approval.\n\nHandle Feedback: If the user responds with a negative approval, you must ask them \"Why do you not approve this plan?\" and then \"How can I adjust it to better suit your needs?\" to get feedback for a new iteration. Then, the user will return this comment: {{ $json.data.text }}. Use the user returned comment to improve your results. If the user approves, you will proceed to the final step.\n\nFinalization: Upon approval, create an Excel file in the same location as the source file. This Excel file must have at least two separate sheets: one for the Timetable and one for the Summary. Write the content of your generated plan into the corresponding sheets.\n\nIMPORTANT: For your response to user, you MUST use the `format_final_json_response` tool with your complete answer formatted according to the required schema. Do not attempt to format the JSON manually - always use this tool. Your response will be rejected if it is not properly formatted through this tool. Only use this tool once you are ready to provide your final answer\n\n"
+        }
+      },
+      "id": "41174c8a-6ac8-42bd-900e-ca15196600c5",
+      "name": "Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        880,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "MyFirstAgent",
+        "contextWindowLength": 25
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        736,
+        336
+      ],
+      "id": "02fc3fea-3caf-42c9-aaf0-2fc3826d5313",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "toolDescription": "After finding the file's ID in the previous step, this node will download its content.",
+        "url": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('URL', ``, 'string') }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "alt",
+              "value": "=media"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        1104,
+        336
+      ],
+      "id": "57fce8fa-4af3-45ff-b6e0-2122afba7419",
+      "name": "getFileContent",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "IRQ8nkXPEw0TKAJW",
+          "name": "DriveOauth2Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "This node will perform the dynamic search using the Google Drive API's files list endpoint.",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters0_Value', ``, 'string') }}"
+            },
+            {
+              "name": "fields",
+              "value": "files(id, name, mimeType)"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        928,
+        336
+      ],
+      "id": "f87b1dd1-1784-489c-8d52-635bdda4df40",
+      "name": "GetFilesList",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "IRQ8nkXPEw0TKAJW",
+          "name": "DriveOauth2Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-3.5-turbo",
+          "mode": "list",
+          "cachedResultName": "gpt-3.5-turbo"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        528,
+        336
+      ],
+      "id": "ae459c90-8081-457c-b31e-0d9ae8871984",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "qEC1SsOWafYQ6Ilk",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\t\"filename\": \"California\",\n\t\"startdate\": \"\",\n    \"endDate\":\"\",\n    \"fullMessage\": \"\",\n    \"fileid\": \"\",\n    \"Summary\": \"\",\n    \"TripTimeTable\":\"| Day    | Time     | Activity    | Location         |\\n|--------|----------|-------------|------------------|\\n| Monday | 09:00 AM | Breakfast   | Hotel Restaurant |\\n| Monday | 10:00 AM | City Tour   | Downtown         |\"\n}",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1296,
+        336
+      ],
+      "id": "48a9501a-8e02-420c-8f41-fa145e124898",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "gpt-4o"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1296,
+        560
+      ],
+      "id": "16f319ef-9c72-40b1-866a-88a32a3aafbb",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "qEC1SsOWafYQ6Ilk",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "siata.coulibaly02@gmail.com",
+        "subject": "Travel Plan For Your Trip",
+        "message": "=Hello Siata,\n\nHere is your {{ $('Agent').item.json.output.filename }} trip planning summary:\n{{ $('Agent').item.json.output.Summary }}\n\nBest,\nYour Trip AI Agent",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1520,
+        16
+      ],
+      "id": "fe77eba3-69c4-4b8a-aa3b-4a9a181cd405",
+      "name": "SendSummaryEmail",
+      "webhookId": "83d29a3d-a1ab-4922-bc79-dadec51d7af4",
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "xvFDP7t5wKtiJenN",
+          "name": "Gmail account 02"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a9eae024-b088-4f8e-9ed8-7018526d5956",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1792,
+        16
+      ],
+      "id": "6141d587-5548-43c2-acea-080aacbc1a4a",
+      "name": "CheckApprovalResponse"
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "title": "=Trip Plan -  {{ $('Agent').item.json.output.filename }} - {{ $('Agent').item.json.output.startdate }} - {{ $('Agent').item.json.output.endDate }}",
+        "sheetsUi": {
+          "sheetValues": [
+            {
+              "title": "TimeTable"
+            },
+            {
+              "title": "Summary"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1984,
+        -240
+      ],
+      "id": "5ee89ad9-153c-4a28-acdf-bddecd0e7362",
+      "name": "Create spreadsheet1",
+      "alwaysOutputData": false,
+      "executeOnce": true,
+      "retryOnFail": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dlh6kq50caWeiBR8",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the raw AI response from the previous node\n//const fullResponse = $input.first().json.output;\n\n// 2. Separate the timetable and summary sections\n// The AI's output should follow the structure we defined in the prompt\nconst [timetableText] = [$('Agent').first().json.output.TripTimeTable];\n\n// 3. Parse the Timetable Markdown into a JSON Array\nconst timetableRows = timetableText.trim().split('\\n').filter(row => row.startsWith('|')).slice(2);\nconst timetableData = timetableRows.slice(0,timetableRows.length - 1).map(row => {\n  const [empty, Day, Time, Activity, Location] = row.split('|').map(cell => cell.trim());\n  return { Day, Time, Activity, Location };\n});\n\n// 4. Create the final JSON object for the Spreadsheet File node\nconst sheetsData = {\n  Day: timetableData.map(elt=> elt.Day),\n  Time: timetableData.map(elt=> elt.Time),\n  Activity: timetableData.map(elt=> elt.Activity),\n  Location: timetableData.map(elt=> elt.Location)\n};\n\n/**const sheetsList = [\n  [\"Day\", \"Time\", \"Activity\", \"Location\"],\n  [timetableData[0].Day, timetableData[0].Time, timetableData[0].Activity, timetableData[0].Location]\n  [\"1\", \"2\", \"3\", \"4\"]\n]**/\n\n// Return the structured data for the next node\nreturn timetableData.map(row => ({ json: row }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2256,
+        -352
+      ],
+      "id": "ca6915d2-55ff-470f-a544-75e95d721195",
+      "name": "Timetable code"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Separate the timetable and summary sections\n// The AI's output should follow the structure we defined in the prompt\nconst [summaryText] = [$('Agent').first().json.output.Summary];\n\n// 2. Create the final JSON object for the Spreadsheet File node\nconst sheetsData = {\n  Summary: summaryText.trim()\n};\n\n// Return the structured data for the next node\nreturn [{ json: sheetsData }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2256,
+        -128
+      ],
+      "id": "0c27af84-02dc-45b8-a49f-bbcdc671fe68",
+      "name": "Summary Code"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Create spreadsheet1').item.json.spreadsheetUrl }}",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Create spreadsheet1').item.json.sheets[1].properties.sheetId }}",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "Summary"
+          ],
+          "schema": [
+            {
+              "id": "Summary",
+              "displayName": "Summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2624,
+        -128
+      ],
+      "id": "d366891f-9b98-4471-bbef-f7e11b6e66d9",
+      "name": "Add Summary Data",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dlh6kq50caWeiBR8",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Create spreadsheet1').item.json.spreadsheetUrl }}",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Create spreadsheet1').item.json.sheets[0].properties.sheetId }}",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "timetable"
+          ],
+          "schema": [
+            {
+              "id": "Day",
+              "displayName": "Day",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Activity",
+              "displayName": "Activity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Location",
+              "displayName": "Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2624,
+        -352
+      ],
+      "id": "3dd877f9-fe40-4cdf-a2a8-0985c6aaec91",
+      "name": "Add Timetable Data",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dlh6kq50caWeiBR8",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d80e5fa1-68bf-4c30-8eda-2e7ffb4c9c2b",
+              "leftValue": "={{ $json.output.TripTimeTable }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "297bb30e-516b-4a21-adce-d5a7ea69191d",
+              "leftValue": "={{ $json.output.Summary }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1232,
+        32
+      ],
+      "id": "9a48f99e-eb66-4dd4-8fae-9b5c542d4b96",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "siata.coulibaly02@gmail.com",
+        "subject": "Travel Plan For Your Trip",
+        "message": "=Hello Siata,\n\nWhy did you decline the proposed trip plan?\n\nBest,\nYour Trip AI Agent",
+        "responseType": "freeText",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2048,
+        368
+      ],
+      "id": "b98f6234-2fc8-475c-99f7-d9dd6c815910",
+      "name": "GetDeclineReason",
+      "webhookId": "83d29a3d-a1ab-4922-bc79-dadec51d7af4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "xvFDP7t5wKtiJenN",
+          "name": "Gmail account 02"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "getFileContent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetFilesList": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Structured Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SendSummaryEmail": {
+      "main": [
+        [
+          {
+            "node": "CheckApprovalResponse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckApprovalResponse": {
+      "main": [
+        [
+          {
+            "node": "Create spreadsheet1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GetDeclineReason",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create spreadsheet1": {
+      "main": [
+        [
+          {
+            "node": "Summary Code",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Timetable code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary Code": {
+      "main": [
+        [
+          {
+            "node": "Add Summary Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Timetable code": {
+      "main": [
+        [
+          {
+            "node": "Add Timetable Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "SendSummaryEmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetDeclineReason": {
+      "main": [
+        [
+          {
+            "node": "Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "73392aea-cc6c-42d4-9a0c-f3f5276167ae",
+  "meta": {
+    "templateId": "self-building-ai-agent",
+    "templateCredsSetupCompleted": true,
+    "instanceId": "212392fa9398a00d64e8d72d26b1d7c69e0b2ced41eb2bf96c598a37a1a3644c"
+  },
+  "id": "cu22mkpFoRyFSBCi",
+  "tags": []
+}
