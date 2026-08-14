@@ -1,4 +1,4 @@
-# %%
+
 # Libraries
 
 import os
@@ -21,12 +21,11 @@ from langchain_community.tools import DuckDuckGoSearchResults
 from duckduckgo_search import DDGS
 from youtube_transcript_api import YouTubeTranscriptApi
 
-# %%
+
 # Configuration - Keys placeholders
 OPENAI_API_KEY = ${{DS-Env.OPENAI_API_KEY}}
 YOUTUBE_API_KEY = ${{DS-Env.YOUTUBE_API_KEY}}
 
-# %%
 INDEX_PATH = "chef_faiss_index"
 
 # apply keys to env so LangChain/OpenAI clients pick them up
