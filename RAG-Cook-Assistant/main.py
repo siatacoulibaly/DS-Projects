@@ -165,54 +165,6 @@ class RAGChefAgent:
         sources = [{"source": d.metadata.get("source"), "excerpt": d.page_content[:300]} for d in docs]
         return {"answer": answer, "sources": sources}
 
-# FastAPI deployment
-app = FastAPI()
-agent = RAGChefAgent()
-# try to load existing index on startup
-try:
-    agent.load_index()
-except Exception:
-    pass
-
-class IngestRequest(BaseModel):
-    mode: str  # "youtube" | "google" | "blogs"
-    query: str = None
-    urls: List[str] = None
-    max_results: int = 5
-
-class AskRequest(BaseModel):
-    question: str
-
-@app.post("/ingest")
-def ingest(req: IngestRequest):
-    try:
-        if req.mode == "youtube":
-            if not req.query:
-                raise HTTPException(status_code=400, detail="query required for youtube")
-            agent.ingest_youtube(req.query, max_results=req.max_results or 5)
-        elif req.mode == "google":
-            if not req.query:
-                raise HTTPException(status_code=400, detail="query required for google")
-            agent.ingest_google(req.query, max_results=req.max_results or 10)
-        elif req.mode == "blogs":
-            if not req.urls:
-                raise HTTPException(status_code=400, detail="urls required for blogs")
-            agent.ingest_blogs(req.urls)
-        else:
-            raise HTTPException(status_code=400, detail="invalid mode")
-        agent.load_index()
-        return {"status": "ok"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/ask")
-def ask(req: AskRequest):
-    try:
-        out = agent.ask(req.question)
-        return out
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 
 # FastAPI deployment
