@@ -23,8 +23,8 @@ from youtube_transcript_api import YouTubeTranscriptApi
 
 
 # Configuration - Keys placeholders
-OPENAI_API_KEY = ${{DS-Env.OPENAI_API_KEY}}
-YOUTUBE_API_KEY = ${{DS-Env.YOUTUBE_API_KEY}}
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 INDEX_PATH = "chef_faiss_index"
 
