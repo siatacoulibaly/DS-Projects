@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+requests
+beautifulsoup4
+langchain-core
+langchain-text-splitters
+langchain-openai
+langchain-community
+faiss-cpu
+duckduckgo-search
+youtube-transcript-api
