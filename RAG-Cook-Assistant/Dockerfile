@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 
 # Install python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --user --root-user-action=ignore -r requirements.txt
 
 # Copy the rest of your application code
 COPY . .
