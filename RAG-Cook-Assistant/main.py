@@ -286,8 +286,12 @@ def chat_ui():
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ question: question })
                     });
+                    if (!response.ok) {
+                        throw new Error(`Server returned status ${response.status}`);
+                    }
+                    
                     const data = await response.json();
-                    const answer = data.answer || "Sorry, I encountered an error.";
+                    const answer = data.answer || "Sorry, I received an empty response.";
                     chatBox.innerHTML += `<div class="message bot-msg">${answer}</div>`;
                 } catch (err) {
                     chatBox.innerHTML += `<div class="message bot-msg">Error connecting to server.</div>`;
