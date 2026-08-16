@@ -91,9 +91,10 @@ class RAGChefAgent:
         self.index_path = index_path
         self.splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
         self.embeddings = OpenAIEmbeddings()
-        self.index = None  # FAISS instance
-        self.llm = ChatOpenAI(temperature=0.2, model="gpt-4o-mini")  # change model if needed
+        self.index = None
+        self.llm = ChatOpenAI(temperature=0.3, model="gpt-4o-mini")
         self.qa_chain = None
+        self.load_index()
 
     def _docs_to_index(self, docs: List[Document]) -> None:
         if not docs:
@@ -102,10 +103,10 @@ class RAGChefAgent:
             self.index.add_documents(docs)
         else:
             self.index = FAISS.from_documents(docs, self.embeddings)
-        # persist
         self.index.save_local(self.index_path)
+        self.load_index()
 
-    def ingest_youtube(self, query: str, max_results: int = 5):
+    def ingest_youtube(self, query: str, max_results: int = 3):
         ids = youtube_search_video_ids(query, max_results=max_results)
         docs = []
         for vid in ids:
@@ -113,10 +114,10 @@ class RAGChefAgent:
             if not txt:
                 continue
             for chunk in self.splitter.split_text(txt):
-                docs.append(Document(page_content=chunk, metadata={"source": f"youtube:{vid}", "query": query}))
+                docs.append(Document(page_content=chunk, metadata={"source": f"https://youtube.com/watch?v={vid}", "query": query}))
         self._docs_to_index(docs)
 
-    def ingest_google(self, query: str, max_results: int = 10):
+    def ingest_google(self, query: str, max_results: int = 5):
         results = duckduckgo_search(query, num=max_results)
         docs = []
         for res in results:
@@ -128,28 +129,22 @@ class RAGChefAgent:
                 docs.append(Document(page_content=chunk, metadata={"source": link, "title": res.get("title")}))
         self._docs_to_index(docs)
 
-    def ingest_blogs(self, urls: List[str]):
-        docs = []
-        for url in urls:
-            text = fetch_page_text(url)
-            if not text:
-                continue
-            for chunk in self.splitter.split_text(text):
-                docs.append(Document(page_content=chunk, metadata={"source": url}))
-        self._docs_to_index(docs)
-
     def load_index(self):
         if os.path.exists(self.index_path):
-            self.index = FAISS.load_local(self.index_path, self.embeddings)
+            try:
+                self.index = FAISS.load_local(self.index_path, self.embeddings, allow_dangerous_deserialization=True)
+            except Exception:
+                self.index = None
         else:
             self.index = None
+
         if self.index:
-            retriever = self.index.as_retriever(search_kwargs={"k": 5})
+            retriever = self.index.as_retriever(search_kwargs={"k": 4})
             prompt = PromptTemplate(
                 input_variables=["context", "question"],
                 template=(
-                    "You are a helpful cooking chef assistant. Use the provided context (web, videos, blogs) to answer "
-                    "the user's question in a friendly, actionable way. Provide steps, timings, and ingredient notes when relevant.\n\n"
+                    "You are a friendly and helpful cooking chef assistant. Use the provided context to answer "
+                    "the user's question with steps, timings, and ingredient notes when relevant.\n\n"
                     "Context:\n{context}\n\nQuestion: {question}\nAnswer:"
                 ),
             )
@@ -158,13 +153,37 @@ class RAGChefAgent:
             )
 
     def ask(self, question: str) -> Dict[str, Any]:
-        if not self.index:
-            raise RuntimeError("Index not loaded. Call load_index() or ingest data first.")
-        res = self.qa_chain({"query": question})
-        answer = res.get("result")
-        docs = res.get("source_documents", [])
-        sources = [{"source": d.metadata.get("source"), "excerpt": d.page_content[:300]} for d in docs]
-        return {"answer": answer, "sources": sources}
+        ql = question.lower()
+        # If the user asks for a recipe and the index is empty, auto-fetch from DuckDuckGo/YouTube on the fly!
+        recipe_keywords = ["recipe", "how to make", "cook", "prepare", "ingredients", "dish", "meal"]
+        is_recipe_request = any(kw in ql for kw in recipe_keywords)
+
+        if is_recipe_request and not self.index:
+            # Automatically ingest web content for this specific recipe query
+            try:
+                self.ingest_google(question, max_results=3)
+            except Exception:
+                pass
+
+        # If we have an active QA chain and an index, use RAG
+        if self.index and self.qa_chain:
+            try:
+                res = self.qa_chain({"query": question})
+                answer = res.get("result")
+                docs = res.get("source_documents", [])
+                sources = [{"source": d.metadata.get("source"), "excerpt": d.page_content[:200]} for d in docs]
+                return {"answer": answer, "sources": sources}
+            except Exception:
+                pass
+
+        # Fallback: pure conversational response from the LLM when no index/documents are needed
+        messages = [
+            {"role": "system", "content": "You are a friendly personal chef assistant. Answer the user conversationally, helpfully, and concisely."},
+            {"role": "user", "content": question}
+        ]
+        response = self.llm.invoke(messages)
+        return {"answer": response.content, "sources": []}
+
 
 
 
