@@ -20,6 +20,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_community.tools import DuckDuckGoSearchResults
 from duckduckgo_search import DDGS
 from youtube_transcript_api import YouTubeTranscriptApi
+from fastapi.responses import HTMLResponse
 
 
 # Configuration - Keys placeholders
@@ -219,3 +220,62 @@ def ask(req: AskRequest):
 @app.get("/status")
 def status():
     return {"index_loaded": agent.index is not None}
+
+@app.get("/", response_class=HTMLResponse)
+def chat_ui():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Your Personal Chef Assistant</title>
+        <style>
+            body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 20px; display: flex; justify-content: center; }
+            .chat-container { width: 100%; max-width: 600px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+            .chat-box { height: 400px; border: 1px solid #ddd; border-radius: 4px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; background: #fafafa; }
+            .message { margin-bottom: 10px; padding: 8px 12px; border-radius: 6px; max-width: 80%; }
+            .user-msg { background: #007bff; color: white; margin-left: auto; text-align: right; }
+            .bot-msg { background: #e9ecef; color: #333; }
+            .input-group { display: flex; gap: 10px; }
+            input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+            button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+            button:hover { background: #0056b3; }
+        </style>
+    </head>
+    <body>
+        <div class="chat-container">
+            <h2>🍳 Your personal Chef Assistant</h2>
+            <div id="chat-box" class="chat-box"></div>
+            <div class="input-group">
+                <input type="text" id="user-input" placeholder="Ask a cooking question..." onkeydown="if(event.key==='Enter') sendMessage()">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+        <script>
+            async function sendMessage() {
+                const inputField = document.getElementById('user-input');
+                const chatBox = document.getElementById('chat-box');
+                const question = inputField.value.trim();
+                if (!question) return;
+
+                chatBox.innerHTML += `<div class="message user-msg">${question}</div>`;
+                inputField.value = '';
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+                try {
+                    const response = await fetch('/ask', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ question: question })
+                    });
+                    const data = await response.json();
+                    const answer = data.answer || "Sorry, I encountered an error.";
+                    chatBox.innerHTML += `<div class="message bot-msg">${answer}</div>`;
+                } catch (err) {
+                    chatBox.innerHTML += `<div class="message bot-msg">Error connecting to server.</div>`;
+                }
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        </script>
+    </body>
+    </html>
+    """
