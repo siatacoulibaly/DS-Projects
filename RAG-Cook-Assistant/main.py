@@ -91,7 +91,7 @@ class RAGChefAgent:
         self.splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
         self.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
         self.index = None
-        self.llm = ChatGoogleGenerativeAI(temperature=0.3, model="gemini-2.0-flash")
+        self.llm = ChatGoogleGenerativeAI(temperature=0.3, model="gemini-3.5-flash")
         self.qa_chain = None
         self.load_index()
 
