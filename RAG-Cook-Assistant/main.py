@@ -28,8 +28,8 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 INDEX_PATH = "chef_faiss_index"
 
-# apply keys to env so LangChain/OpenAI clients pick them up
-os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+# apply keys to env so LangChain/GenAI clients pick them up
+os.environ["GOOGLE_API_KEY"] = OPENAI_API_KEY
 
 # Utilities
 def clean_text(text: str) -> str:
