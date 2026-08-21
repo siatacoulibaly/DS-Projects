@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI
 from langchain_classic.chains import RetrievalQA
@@ -90,9 +90,9 @@ class RAGChefAgent:
     def __init__(self, index_path: str = INDEX_PATH):
         self.index_path = index_path
         self.splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
-        self.embeddings = OpenAIEmbeddings()
+        self.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
         self.index = None
-        self.llm = ChatOpenAI(temperature=0.3, model="gpt-4o-mini")
+        self.llm = ChatGoogleGenerativeAI(temperature=0.3, model="gemini-1.5-flash")
         self.qa_chain = None
         self.load_index()
 

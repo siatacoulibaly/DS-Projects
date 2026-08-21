@@ -5,7 +5,7 @@ requests
 beautifulsoup4
 langchain-core
 langchain-text-splitters
-langchain-openai
+langchain-google-genai
 langchain-community
 faiss-cpu
 duckduckgo-search
