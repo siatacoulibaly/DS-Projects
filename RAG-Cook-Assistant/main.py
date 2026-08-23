@@ -286,7 +286,14 @@ def chat_ui():
                         body: JSON.stringify({ question: question })
                     });
                     if (!response.ok) {
-                        throw new Error(`Server returned status ${response.status}`);
+                        const errData = await response.json().catch(() => ({}));
+                        let errorText = `Server status ${response.status}`;
+                        if (errData.detail) {
+                            errorText = typeof errData.detail === 'string' 
+                                ? errData.detail 
+                                : JSON.stringify(errData.detail);
+                        }
+                        throw new Error(errorText);
                     }
                     
                     const data = await response.json();
