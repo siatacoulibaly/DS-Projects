@@ -93,6 +93,12 @@ class RAGChefAgent:
         self.index = None
         self.llm = ChatGoogleGenerativeAI(temperature=0.3, model="gemini-3.5-flash")
         self.qa_chain = None
+
+        # Initialize conversation history with system prompt
+        self.chat_history = [
+            {"role": "system", "content": "You are a friendly personal chef assistant. Answer the user conversationally, helpfully, and concisely, keeping track of previous context."}
+        ]
+
         self.load_index()
 
     def _docs_to_index(self, docs: List[Document]) -> None:
@@ -177,14 +183,19 @@ class RAGChefAgent:
             except Exception:
                 pass
 
+         # Append user question to history
+        self.chat_history.append({"role": "user", "content": question})
+
         # Fallback: pure conversational response from the LLM when no index/documents are needed
         if not answer:
-            messages = [
-                {"role": "system", "content": "You are a friendly personal chef assistant. Answer the user conversationally, helpfully, and concisely."},
-                {"role": "user", "content": question}
-            ]
-            response = self.llm.invoke(messages)
+            response = self.llm.invoke(self.chat_history)
             answer = response.content
+
+        # Append assistant response to history
+        self.chat_history.append({"role": "assistant", "content": str(answer)})
+
+        if len(self.chat_history) > 21: # Keep only the last 20 messages (10 user + 10 assistant) plus the system prompt
+            self.chat_history = [self.chat_history[0]] + self.chat_history[-20:]
 
         # Normalize raw_answer into a clean string if it's a list or structured object
         if isinstance(answer, list):
@@ -264,6 +275,7 @@ def chat_ui():
     <html>
     <head>
         <title>Your Personal Chef Assistant</title>
+        <!-- Include Marked.js for clean Markdown rendering -->
         <style>
             body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 20px; display: flex; justify-content: center; }
             .chat-container { width: 100%; max-width: 600px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
@@ -316,7 +328,9 @@ def chat_ui():
                     
                     const data = await response.json();
                     const answer = data.answer || "Sorry, I received an empty response.";
-                    chatBox.innerHTML += `<div class="message bot-msg">${answer}</div>`;
+                    // Parse markdown into clean HTML
+                    const formattedAnswer = marked.parse(answer);
+                    chatBox.innerHTML += `<div class="message bot-msg">${formattedAnswer}</div>`;
                 } catch (err) {
                     chatBox.innerHTML += `<div class="message bot-msg">Error connecting to server.</div>`;
                 }
