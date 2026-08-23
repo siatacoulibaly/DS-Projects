@@ -165,6 +165,8 @@ class RAGChefAgent:
                 pass
 
         # If we have an active QA chain and an index, use RAG
+        sources = []
+        answer = None
         if self.index and self.qa_chain:
             try:
                 res = self.qa_chain({"query": question})
@@ -176,12 +178,28 @@ class RAGChefAgent:
                 pass
 
         # Fallback: pure conversational response from the LLM when no index/documents are needed
-        messages = [
-            {"role": "system", "content": "You are a friendly personal chef assistant. Answer the user conversationally, helpfully, and concisely."},
-            {"role": "user", "content": question}
-        ]
-        response = self.llm.invoke(messages)
-        return {"answer": response.content, "sources": []}
+        if not answer:
+            messages = [
+                {"role": "system", "content": "You are a friendly personal chef assistant. Answer the user conversationally, helpfully, and concisely."},
+                {"role": "user", "content": question}
+            ]
+            response = self.llm.invoke(messages)
+            answer = response.content
+
+        # Normalize raw_answer into a clean string if it's a list or structured object
+        if isinstance(answer, list):
+            text_parts = []
+            for part in answer:
+                if isinstance(part, dict) and "text" in part:
+                    text_parts.append(part["text"])
+                elif hasattr(part, "get") and part.get("text"):
+                    text_parts.append(part.get("text"))
+                else:
+                    text_parts.append(str(part))
+            answer_str = "".join(text_parts)
+        else:
+            answer_str = str(answer)
+        return {"answer": answer_str, "sources": sources}
 
 
 
