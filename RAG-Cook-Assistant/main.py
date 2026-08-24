@@ -6,9 +6,10 @@ import re
 import json
 import time
 import requests
+import uuid
 from typing import List, Dict, Any
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Cookie, Response
 from pydantic import BaseModel
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -84,6 +85,9 @@ def fetch_page_text(url: str) -> str:
     except Exception:
         return ""
 
+
+
+
 # Indexing
 class RAGChefAgent:
     def __init__(self, index_path: str = INDEX_PATH):
@@ -157,7 +161,7 @@ class RAGChefAgent:
                 llm=self.llm, chain_type="stuff", retriever=retriever, return_source_documents=True, chain_type_kwargs={"prompt": prompt}
             )
 
-    def ask(self, question: str) -> Dict[str, Any]:
+    def ask(question: str) -> Dict[str, Any]:
         ql = question.lower()
         # If the user asks for a recipe and the index is empty, auto-fetch from DuckDuckGo/YouTube on the fly!
         recipe_keywords = ["recipe", "how to make", "cook", "prepare", "ingredients", "dish", "meal"]
@@ -166,7 +170,7 @@ class RAGChefAgent:
         if is_recipe_request and not self.index:
             # Automatically ingest web content for this specific recipe query
             try:
-                self.ingest_google(question, max_results=3)
+                self.ingest_google(req.question, max_results=3)
             except Exception:
                 pass
 
@@ -230,7 +234,15 @@ class RAGChefAgent:
         return {"answer": answer_str, "sources": sources}
 
 
+#Store active user sessions in memory
+sessions = {}
 
+def get_user_agent(session_id: str) -> RAGChefAgent:
+    if session_id not in sessions:
+        # Give each user their own isolated index directory
+        user_index_path = f"chef_faiss_index_{session_id}"
+        sessions[session_id] = RAGChefAgent(index_path=user_index_path)
+    return sessions[session_id]
 
 # FastAPI deployment
 app = FastAPI()
@@ -252,7 +264,13 @@ class AskRequest(BaseModel):
     question: str
 
 @app.post("/ingest")
-def ingest(req: IngestRequest):
+def ingest(req: IngestRequest, session_id: str = Cookie(None), response: Response = None):
+    if not session_id:
+        session_id = str(uuid.uuid4())
+        response.set_cookie(key="session_id", value=session_id)
+        
+    agent = get_user_agent(session_id)
+    
     try:
         if req.mode == "youtube":
             if not req.query:
@@ -274,7 +292,11 @@ def ingest(req: IngestRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/ask")
-def ask(req: AskRequest):
+def ask(req: AskRequest, session_id: str = Cookie(None), response: Response = None):
+    if not session_id:
+        session_id = str(uuid.uuid4())
+        response.set_cookie(key="session_id", value=session_id)
+
     try:
         out = agent.ask(req.question)
         return out
@@ -293,6 +315,7 @@ def chat_ui():
     <head>
         <title>Your Personal Chef Assistant</title>
         <!-- Include Marked.js for clean Markdown rendering -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
         <style>
             body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 20px; display: flex; justify-content: center; }
@@ -360,7 +383,7 @@ def chat_ui():
                         sourceLinks += '</ul></small>';
                         formattedAnswer += sourceLinks;
                     }
-                    
+
                     chatBox.innerHTML += `<div class="message bot-msg">${formattedAnswer}</div>`;
                 } catch (err) {
                     chatBox.innerHTML += `<div class="message bot-msg">Error connecting to server.</div>`;
