@@ -226,7 +226,7 @@ class RAGChefAgent:
                     answer_str = parsed_json.get("text", answer_str)
             except Exception:
                 pass
-            
+
         return {"answer": answer_str, "sources": sources}
 
 
@@ -348,6 +348,19 @@ def chat_ui():
                     const answer = data.answer || "Sorry, I received an empty response.";
                     // Parse markdown into clean HTML
                     const formattedAnswer = marked.parse(answer);
+
+                    // If video or web sources were retrieved, append them nicely
+                    if (data.sources && data.sources.length > 0) {
+                        let sourceLinks = '<br><br><small style="color: #666;"><strong>Sources:</strong><ul style="margin: 2px 0; padding-left: 15px;">';
+                        data.sources.forEach(src => {
+                            if (src.source) {
+                                sourceLinks += `<li><a href="${src.source}" target="_blank" style="color: #007bff; text-decoration: none;">${src.source}</a></li>`;
+                            }
+                        });
+                        sourceLinks += '</ul></small>';
+                        formattedAnswer += sourceLinks;
+                    }
+                    
                     chatBox.innerHTML += `<div class="message bot-msg">${formattedAnswer}</div>`;
                 } catch (err) {
                     chatBox.innerHTML += `<div class="message bot-msg">Error connecting to server.</div>`;
