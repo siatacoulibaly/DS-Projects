@@ -6,9 +6,10 @@ import re
 import json
 import time
 import requests
+import uuid
 from typing import List, Dict, Any
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Cookie, Response
 from pydantic import BaseModel
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -83,6 +84,9 @@ def fetch_page_text(url: str) -> str:
         return clean_text(" ".join([t for t in texts if t]))
     except Exception:
         return ""
+
+
+
 
 # Indexing
 class RAGChefAgent:
@@ -226,11 +230,19 @@ class RAGChefAgent:
                     answer_str = parsed_json.get("text", answer_str)
             except Exception:
                 pass
-            
+
         return {"answer": answer_str, "sources": sources}
 
 
+#Store active user sessions in memory
+sessions = {}
 
+def get_user_agent(session_id: str) -> RAGChefAgent:
+    if session_id not in sessions:
+        # Give each user their own isolated index directory
+        user_index_path = f"chef_faiss_index_{session_id}"
+        sessions[session_id] = RAGChefAgent(index_path=user_index_path)
+    return sessions[session_id]
 
 # FastAPI deployment
 app = FastAPI()
@@ -252,7 +264,13 @@ class AskRequest(BaseModel):
     question: str
 
 @app.post("/ingest")
-def ingest(req: IngestRequest):
+def ingest(req: IngestRequest, session_id: str = Cookie(None), response: Response = None):
+    if not session_id:
+        session_id = str(uuid.uuid4())
+        response.set_cookie(key="session_id", value=session_id)
+        
+    agent = get_user_agent(session_id)
+
     try:
         if req.mode == "youtube":
             if not req.query:
@@ -274,7 +292,11 @@ def ingest(req: IngestRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/ask")
-def ask(req: AskRequest):
+def ask(req: AskRequest, session_id: str = Cookie(None), response: Response = None):
+    if not session_id:
+        session_id = str(uuid.uuid4())
+        response.set_cookie(key="session_id", value=session_id)
+
     try:
         out = agent.ask(req.question)
         return out
@@ -293,6 +315,7 @@ def chat_ui():
     <head>
         <title>Your Personal Chef Assistant</title>
         <!-- Include Marked.js for clean Markdown rendering -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
         <style>
             body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 20px; display: flex; justify-content: center; }
@@ -348,6 +371,19 @@ def chat_ui():
                     const answer = data.answer || "Sorry, I received an empty response.";
                     // Parse markdown into clean HTML
                     const formattedAnswer = marked.parse(answer);
+
+                    // If video or web sources were retrieved, append them nicely
+                    if (data.sources && data.sources.length > 0) {
+                        let sourceLinks = '<br><br><small style="color: #666;"><strong>Sources:</strong><ul style="margin: 2px 0; padding-left: 15px;">';
+                        data.sources.forEach(src => {
+                            if (src.source) {
+                                sourceLinks += `<li><a href="${src.source}" target="_blank" style="color: #007bff; text-decoration: none;">${src.source}</a></li>`;
+                            }
+                        });
+                        sourceLinks += '</ul></small>';
+                        formattedAnswer += sourceLinks;
+                    }
+
                     chatBox.innerHTML += `<div class="message bot-msg">${formattedAnswer}</div>`;
                 } catch (err) {
                     chatBox.innerHTML += `<div class="message bot-msg">Error connecting to server.</div>`;
