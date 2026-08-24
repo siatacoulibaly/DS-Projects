@@ -201,15 +201,32 @@ class RAGChefAgent:
         if isinstance(answer, list):
             text_parts = []
             for part in answer:
-                if isinstance(part, dict) and "text" in part:
-                    text_parts.append(part["text"])
-                elif hasattr(part, "get") and part.get("text"):
-                    text_parts.append(part.get("text"))
+                if isinstance(part, dict):
+                    if "text" in part:
+                        text_parts.append(str(part["text"]))
+                    elif "content" in part:
+                        text_parts.append(str(part["content"]))
+                elif hasattr(part, "text"):
+                    text_parts.append(str(part.text))
                 else:
                     text_parts.append(str(part))
             answer_str = "".join(text_parts)
+        elif isinstance(answer, dict):
+            answer_str = str(answer.get("text") or answer.get("content") or json.dumps(answer))
         else:
             answer_str = str(answer)
+
+        # Remove any lingering raw dictionary artifacts just in case
+        if answer_str.startswith("[{") or answer_str.startswith("{"):
+            try:
+                parsed_json = json.loads(answer_str.replace("'", '"'))
+                if isinstance(parsed_json, list):
+                    answer_str = "".join([item.get("text", str(item)) for item in parsed_json])
+                elif isinstance(parsed_json, dict):
+                    answer_str = parsed_json.get("text", answer_str)
+            except Exception:
+                pass
+            
         return {"answer": answer_str, "sources": sources}
 
 
