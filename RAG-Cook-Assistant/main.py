@@ -161,7 +161,7 @@ class RAGChefAgent:
                 llm=self.llm, chain_type="stuff", retriever=retriever, return_source_documents=True, chain_type_kwargs={"prompt": prompt}
             )
 
-    def ask(question: str) -> Dict[str, Any]:
+    def ask(self, question: str) -> Dict[str, Any]:
         ql = question.lower()
         # If the user asks for a recipe and the index is empty, auto-fetch from DuckDuckGo/YouTube on the fly!
         recipe_keywords = ["recipe", "how to make", "cook", "prepare", "ingredients", "dish", "meal"]
@@ -170,7 +170,7 @@ class RAGChefAgent:
         if is_recipe_request and not self.index:
             # Automatically ingest web content for this specific recipe query
             try:
-                self.ingest_google(req.question, max_results=3)
+                self.ingest_google(question, max_results=3)
             except Exception:
                 pass
 
@@ -270,7 +270,7 @@ def ingest(req: IngestRequest, session_id: str = Cookie(None), response: Respons
         response.set_cookie(key="session_id", value=session_id)
         
     agent = get_user_agent(session_id)
-    
+
     try:
         if req.mode == "youtube":
             if not req.query:
