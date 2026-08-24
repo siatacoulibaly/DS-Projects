@@ -377,7 +377,7 @@ def chat_ui():
                         let sourceLinks = '<br><br><small style="color: #666;"><strong>Sources:</strong><ul style="margin: 2px 0; padding-left: 15px;">';
                         data.sources.forEach(src => {
                             if (src.source) {
-                                sourceLinks += `<li><a href="${src.source}" target="_blank" style="color: #007bff; text-decoration: none;">${src.source}</a></li>`;
+                                sourceLinks += `<li><a href="${src.source}" onclick="window.open(this.href, '_blank'); return false;" target="_blank" rel="noopener noreferrer" style="color: #007bff; text-decoration: none;">${src.source}</a></li>`;
                             }
                         });
                         sourceLinks += '</ul></small>';
