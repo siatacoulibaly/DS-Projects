@@ -9,7 +9,7 @@ import requests
 import uuid
 from typing import List, Dict, Any
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, HTTPException, Cookie, Response
+from fastapi import FastAPI, HTTPException, Cookie, Response, Query
 from pydantic import BaseModel
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
