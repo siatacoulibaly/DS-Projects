@@ -20,7 +20,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_community.tools import DuckDuckGoSearchResults
 from duckduckgo_search import DDGS
 from youtube_transcript_api import YouTubeTranscriptApi
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 
 # Configuration - Keys placeholders
@@ -297,6 +297,8 @@ def ask(req: AskRequest, session_id: str = Cookie(None), response: Response = No
         session_id = str(uuid.uuid4())
         response.set_cookie(key="session_id", value=session_id)
 
+    agent = get_user_agent(session_id)
+
     try:
         out = agent.ask(req.question)
         return out
@@ -308,7 +310,14 @@ def status():
     return {"index_loaded": agent.index is not None}
 
 @app.get("/", response_class=HTMLResponse)
-def chat_ui():
+def chat_ui(session_id: str = Query(None)):
+    # If no session ID is in the URL, generate one and redirect with it in the query string
+    if not session_id:
+        new_session_id = str(uuid.uuid4())
+        return RedirectResponse(url=f"/?session_id={new_session_id}")
+    
+    # Ensure the session agent exists
+    get_user_agent(session_id)
     return """
     <!DOCTYPE html>
     <html>
@@ -340,6 +349,9 @@ def chat_ui():
             </div>
         </div>
         <script>
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get('session_id');
+
             async function sendMessage() {
                 const inputField = document.getElementById('user-input');
                 const chatBox = document.getElementById('chat-box');
@@ -351,7 +363,7 @@ def chat_ui():
                 chatBox.scrollTop = chatBox.scrollHeight;
 
                 try {
-                    const response = await fetch('/ask', {
+                    const response = await fetch(`/ask?session_id=${sessionId}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ question: question })
